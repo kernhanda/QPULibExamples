@@ -1,0 +1,4 @@
+[submodule "QPULib"]
+	path = QPULib
+	url = https://github.com/kernhanda/QPULib
+	branch = development

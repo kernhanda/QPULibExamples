@@ -98,75 +98,76 @@ std::chrono::system_clock::duration MillisecondTimer::TimeSinceStart() {
 // ============================================================================
 
 int main() {
-  std::random_device rd;
-  std::default_random_engine engine(rd());
-  std::uniform_real_distribution<float> dist;
+  SharedArray<float> foo{};
+  // std::random_device rd;
+  // std::default_random_engine engine(rd());
+  // std::uniform_real_distribution<float> dist;
 
-  // Timestamps
-  timeval tvStart, tvEnd, tvDiff;
+  // // Timestamps
+  // timeval tvStart, tvEnd, tvDiff;
 
-  // const int N = 16 * 24; // 192000
+  // // const int N = 16 * 24; // 192000
 
-  // Construct kernel
-  auto k = compile(dot);
+  // // Construct kernel
+  // auto k = compile(dot);
 
-  // Use 12 QPUs
-  k.setNumQPUs(12);
+  // // Use 12 QPUs
+  // k.setNumQPUs(12);
 
-  const int ITERATIONS = 100;
-  for (unsigned i = 8; i <= (2 << 16); i *= 2) {
-    const unsigned N = 16 * 12 * i;
+  // const int ITERATIONS = 100;
+  // for (unsigned i = 8; i <= (2 << 16); i *= 2) {
+  //   const unsigned N = 16 * 12 * i;
 
-    // Allocate and initialise arrays shared between ARM and GPU
-    std::array<SharedArray<float>, 5> x;
-    std::array<SharedArray<float>, 5> y;
-    SharedArray<float> result(N);
-    std::fill_n(&result[0], N, 0.0f);
-    for (unsigned i = 0; i < x.size(); ++i) {
-      x[i].alloc(N);
-      std::generate_n(&x[i][0], N, [&] { return dist(engine); });
-      y[i].alloc(N);
-      std::generate_n(&y[i][0], N, [&] { return dist(engine); });
-    }
+  //   // Allocate and initialise arrays shared between ARM and GPU
+  //   std::array<SharedArray<float>, 5> x;
+  //   std::array<SharedArray<float>, 5> y;
+  //   SharedArray<float> result(N);
+  //   std::fill_n(&result[0], N, 0.0f);
+  //   for (unsigned i = 0; i < x.size(); ++i) {
+  //     x[i].alloc(N);
+  //     std::generate_n(&x[i][0], N, [&] { return dist(engine); });
+  //     y[i].alloc(N);
+  //     std::generate_n(&y[i][0], N, [&] { return dist(engine); });
+  //   }
 
-    // warm-up gpu
-    for (unsigned i = 0; i < x.size(); ++i) {
-      k((int)N, &x[i], &y[i], &result);
-      (void)std::accumulate(&result[0], &result[0] + N, 0.f);
-    }
+  //   // warm-up gpu
+  //   for (unsigned i = 0; i < x.size(); ++i) {
+  //     k((int)N, &x[i], &y[i], &result);
+  //     (void)std::accumulate(&result[0], &result[0] + N, 0.f);
+  //   }
 
-    printf("%u,", N);
-    volatile float gpuOut = 0.f;
-    // MillisecondTimer timer;
-    gettimeofday(&tvStart, NULL);
-    for (unsigned j = 0; j < ITERATIONS; ++j) {
-      for (unsigned i = 0; i < x.size(); ++i) {
-        k((int)N, &x[i], &y[i], &result);
-        gpuOut = std::accumulate(&result[0], &result[0] + N, 0.f);
-      }
-    }
-    gettimeofday(&tvEnd, NULL);
-    timersub(&tvEnd, &tvStart, &tvDiff);
-    printf("%ld.%06lds,", tvDiff.tv_sec, tvDiff.tv_usec);
-    // timer.Stop();
-    // auto gpuTime = timer.Elapsed() / (ITERATIONS * x.size());
+  //   printf("%u,", N);
+  //   volatile float gpuOut = 0.f;
+  //   // MillisecondTimer timer;
+  //   gettimeofday(&tvStart, NULL);
+  //   for (unsigned j = 0; j < ITERATIONS; ++j) {
+  //     for (unsigned i = 0; i < x.size(); ++i) {
+  //       k((int)N, &x[i], &y[i], &result);
+  //       gpuOut = std::accumulate(&result[0], &result[0] + N, 0.f);
+  //     }
+  //   }
+  //   gettimeofday(&tvEnd, NULL);
+  //   timersub(&tvEnd, &tvStart, &tvDiff);
+  //   printf("%ld.%06lds,", tvDiff.tv_sec, tvDiff.tv_usec);
+  //   // timer.Stop();
+  //   // auto gpuTime = timer.Elapsed() / (ITERATIONS * x.size());
 
-    volatile float blasOut = 0.f;
-    // timer.Start();
-    gettimeofday(&tvStart, NULL);
-    for (unsigned j = 0; j < ITERATIONS; ++j) {
-      for (unsigned i = 0; i < x.size(); ++i) {
-        blasOut = cblas_sdot(N, &x[i][0], 1, &y[i][0], 1);
-      }
-    }
-    gettimeofday(&tvEnd, NULL);
-    timersub(&tvEnd, &tvStart, &tvDiff);
-    printf("%ld.%06lds\n", tvDiff.tv_sec, tvDiff.tv_usec);
-    // timer.Stop();
-    // auto blasTime = timer.Elapsed() / (ITERATIONS * x.size());
+  //   volatile float blasOut = 0.f;
+  //   // timer.Start();
+  //   gettimeofday(&tvStart, NULL);
+  //   for (unsigned j = 0; j < ITERATIONS; ++j) {
+  //     for (unsigned i = 0; i < x.size(); ++i) {
+  //       blasOut = cblas_sdot(N, &x[i][0], 1, &y[i][0], 1);
+  //     }
+  //   }
+  //   gettimeofday(&tvEnd, NULL);
+  //   timersub(&tvEnd, &tvStart, &tvDiff);
+  //   printf("%ld.%06lds\n", tvDiff.tv_sec, tvDiff.tv_usec);
+  //   // timer.Stop();
+  //   // auto blasTime = timer.Elapsed() / (ITERATIONS * x.size());
 
-    // printf("%u,%llu,%llu\n", N, gpuTime, blasTime);
-  }
+  //   // printf("%u,%llu,%llu\n", N, gpuTime, blasTime);
+  // }
   // gettimeofday(&tvStart, NULL);
   // k(N, &x, &y, &result);
   // float gpuOut = std::accumulate(&result[0], &result[0] + N, 0.f);
