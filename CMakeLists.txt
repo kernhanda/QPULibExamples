@@ -7,3 +7,6 @@ add_subdirectory(QPULib)
 
 add_executable(Dot Dot.cpp)
 target_link_libraries(Dot qpu.a openblas)
+
+add_executable(Accumulator Accumulator.cpp)
+target_link_libraries(Accumulator qpu.a)

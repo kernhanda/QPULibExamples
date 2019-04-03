@@ -16,20 +16,26 @@ using namespace QPULib;
 void dot(Int N, Ptr<Float> A, Ptr<Float> B, Ptr<Float> result) {
   Int inc = 16;
   Int qpuID = me();
-  Ptr<Float> a = A + index() + (qpuID << 4);
-  Ptr<Float> b = B + index() + (qpuID << 4);
+  Ptr<Float> a = A + index() + (qpuID * N);
+  Ptr<Float> b = B + index() + (qpuID * N);
   Ptr<Float> c = result + index() + (qpuID << 4);
+	gather(c);
   gather(a);
   gather(b);
 
-  Float aOld, bOld;
+  Float aOld, bOld, sum;
+	receive(sum);
+  sum = 0;
   For(Int i = 0, i < N, i = i + inc)
-    gather(a + i + inc + (qpuID << 4));
-    gather(b + i + inc + (qpuID << 4));
+    gather(a + i + inc);
+    gather(b + i + inc);
     receive(aOld);
     receive(bOld);
-    store(aOld * bOld, c + i + (qpuID << 4));
+    // store(aOld * bOld, c + i + (qpuID << 4));
+    sum = sum + (aOld * bOld);
   End
+
+	store(sum, c);
 }
 
 class MillisecondTimer {
@@ -107,51 +113,60 @@ int main() {
 
    // const int N = 16 * 24; // 192000
 
-   // Construct kernel
-   auto k = compile(dot);
+    const int NumQPUs = 12;
 
-   // Use 12 QPUs
-   k.setNumQPUs(12);
-
+   printf("N,GPU_Calculated_Value,GPU_Time,BLAS_Calculated_Value,BLAS_Time\n");
    const int ITERATIONS = 100;
-   for (unsigned i = 8; i <= (2 << 4); i *= 2) {
-     const unsigned N = 16 * 12 * i;
+   for (unsigned i = 256; i <= (2 << 8); i *= 2) {
+     const unsigned N = 16 * NumQPUs * i;
 
      // Allocate and initialise arrays shared between ARM and GPU
      std::array<SharedArray<float>, 5> x;
      std::array<SharedArray<float>, 5> y;
-     SharedArray<float> result(N);
-     std::fill_n(&result[0], N, 0.0f);
+     SharedArray<float> result(NumQPUs * 16);
+    //  std::fill_n(&result[0], result.size, 0.0f);
      for (unsigned i = 0; i < x.size(); ++i) {
        x[i].alloc(N);
-       std::generate_n(&x[i][0], N, [&] { return dist(engine); });
+       std::generate_n(&x[i][0], x[i].size, [&] { return dist(engine); });
        y[i].alloc(N);
-       std::generate_n(&y[i][0], N, [&] { return dist(engine); });
+       std::generate_n(&y[i][0], y[i].size, [&] { return dist(engine); });
      }
 
      // warm-up gpu
      for (unsigned i = 0; i < x.size(); ++i) {
-       k((int)N, &x[i], &y[i], &result);
-       (void)std::accumulate(&result[0], &result[0] + N, 0.f);
+       // Construct kernel
+          auto k = compile(dot);
+
+          // Use 12 QPUs
+          k.setNumQPUs(NumQPUs);
+       k((int)(N / NumQPUs), &x[i], &y[i], &result);
+       (void)std::accumulate(&result[0], &result[0] + result.size, 0.f);
+         QPULib::astHeap.clear();
      }
 
      printf("%u,", N);
-     volatile float gpuOut = 0.f;
+     float gpuOut = 0.f;
      // MillisecondTimer timer;
      gettimeofday(&tvStart, NULL);
      for (unsigned j = 0; j < ITERATIONS; ++j) {
        for (unsigned i = 0; i < x.size(); ++i) {
-         k((int)N, &x[i], &y[i], &result);
-         gpuOut = std::accumulate(&result[0], &result[0] + N, 0.f);
+         // Construct kernel
+          auto k = compile(dot);
+
+          // Use 12 QPUs
+          k.setNumQPUs(NumQPUs);
+         k((int)(N / NumQPUs), &x[i], &y[i], &result);
+         gpuOut = std::accumulate(&result[0], &result[0] + result.size, 0.f);
+         QPULib::astHeap.clear();
        }
      }
      gettimeofday(&tvEnd, NULL);
      timersub(&tvEnd, &tvStart, &tvDiff);
-     printf("%ld.%06lds,", tvDiff.tv_sec, tvDiff.tv_usec);
+     printf("%f,%ld.%06lds,", gpuOut, tvDiff.tv_sec, tvDiff.tv_usec);
      // timer.Stop();
      // auto gpuTime = timer.Elapsed() / (ITERATIONS * x.size());
 
-     volatile float blasOut = 0.f;
+     float blasOut = 0.f;
      // timer.Start();
      gettimeofday(&tvStart, NULL);
      for (unsigned j = 0; j < ITERATIONS; ++j) {
@@ -161,7 +176,7 @@ int main() {
      }
      gettimeofday(&tvEnd, NULL);
      timersub(&tvEnd, &tvStart, &tvDiff);
-     printf("%ld.%06lds\n", tvDiff.tv_sec, tvDiff.tv_usec);
+     printf("%f,%ld.%06lds\n", blasOut, tvDiff.tv_sec, tvDiff.tv_usec);
      // timer.Stop();
      // auto blasTime = timer.Elapsed() / (ITERATIONS * x.size());
 
