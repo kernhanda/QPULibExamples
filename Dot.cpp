@@ -148,7 +148,7 @@ int main() {
 
   printf("N,GPU1_Calculated_Value,GPU1_Time,GPU2_Calculated_Value,GPU2_Time,BLAS_Calculated_Value,BLAS_Time\n");
   const int ITERATIONS = 100;
-  for (unsigned i = 256; i <= (2 << 8); i *= 2) {
+  for (unsigned i = 2; i <= (2 << 12); i *= 2) {
     const unsigned N = 16 * NumQPUs * i;
 
     // Allocate and initialise arrays shared between ARM and GPU
