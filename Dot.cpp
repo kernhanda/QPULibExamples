@@ -64,67 +64,6 @@ void dot2(Int N, Ptr<Float> A, Ptr<Float> B, Ptr<Float> result) {
   receive(aOld); receive(bOld);
 }
 
-class MillisecondTimer {
-public:
-  MillisecondTimer();
-
-  void Start();
-
-  void Stop();
-
-  void Restart();
-
-  void Reset();
-
-  std::chrono::milliseconds::rep Elapsed();
-
-private:
-  std::chrono::system_clock::time_point Now();
-  std::chrono::system_clock::duration TimeSinceStart();
-
-  std::chrono::system_clock::time_point _start;
-  std::chrono::system_clock::duration _elapsedTime;
-  bool _running;
-};
-
-MillisecondTimer::MillisecondTimer()
-    : _start(std::chrono::system_clock::now()),
-      _elapsedTime(std::chrono::system_clock::duration::zero()),
-      _running(true) {}
-
-void MillisecondTimer::Start() {
-  Reset();
-  _running = true;
-}
-
-void MillisecondTimer::Stop() {
-  _elapsedTime += TimeSinceStart();
-  _running = false;
-}
-
-void MillisecondTimer::Restart() {
-  _start = Now();
-  _running = true;
-}
-
-void MillisecondTimer::Reset() {
-  _start = Now();
-  _elapsedTime = _elapsedTime.zero();
-}
-
-std::chrono::milliseconds::rep MillisecondTimer::Elapsed() {
-  auto elapsed = _running ? TimeSinceStart() + _elapsedTime : _elapsedTime;
-  return std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
-}
-
-std::chrono::system_clock::time_point MillisecondTimer::Now() {
-  return std::chrono::system_clock::now();
-}
-
-std::chrono::system_clock::duration MillisecondTimer::TimeSinceStart() {
-  return Now() - _start;
-}
-
 // ============================================================================
 // Main
 // ============================================================================
@@ -146,7 +85,7 @@ int main() {
   kDot1.setNumQPUs(NumQPUs);
   kDot2.setNumQPUs(NumQPUs);
 
-  printf("N,GPU1_Calculated_Value,GPU1_Time,GPU2_Calculated_Value,GPU2_Time,BLAS_Calculated_Value,BLAS_Time\n");
+  printf("N,GPU1_Time,GPU2_Time,BLAS_Time\n");
   const int ITERATIONS = 100;
   for (unsigned i = 2; i <= (2 << 12); i *= 2) {
     const unsigned N = 16 * NumQPUs * i;
@@ -173,18 +112,17 @@ int main() {
     }
 
     printf("%u,", N);
-    float gpuOut = 0.f;
-    // MillisecondTimer timer;
+    volatile float unusedOut;
     gettimeofday(&tvStart, NULL);
     for (unsigned j = 0; j < ITERATIONS; ++j) {
       for (unsigned i = 0; i < x.size(); ++i) {
         kDot1((int)(N / NumQPUs), &x[i], &y[i], &result);
-        gpuOut = std::accumulate(&result[0], &result[0] + result.size, 0.f);
+        unusedOut = std::accumulate(&result[0], &result[0] + result.size, 0.f);
       }
     }
     gettimeofday(&tvEnd, NULL);
     timersub(&tvEnd, &tvStart, &tvDiff);
-    printf("%f,%ld.%06lds,", gpuOut, tvDiff.tv_sec, tvDiff.tv_usec);
+    printf("%ld.%06lds,", tvDiff.tv_sec, tvDiff.tv_usec);
 
     ///////////////
     ///////////////
@@ -196,40 +134,30 @@ int main() {
       (void)std::accumulate(&result[0], &result[0] + result.size, 0.f);
     }
 
-    // MillisecondTimer timer;
     gettimeofday(&tvStart, NULL);
     for (unsigned j = 0; j < ITERATIONS; ++j) {
       for (unsigned i = 0; i < x.size(); ++i) {
         kDot2((int)(N), &x[i], &y[i], &result);
-        gpuOut = std::accumulate(&result[0], &result[0] + result.size, 0.f);
+        unusedOut = std::accumulate(&result[0], &result[0] + result.size, 0.f);
       }
     }
     gettimeofday(&tvEnd, NULL);
     timersub(&tvEnd, &tvStart, &tvDiff);
-    printf("%f,%ld.%06lds,", gpuOut, tvDiff.tv_sec, tvDiff.tv_usec);
+    printf("%ld.%06lds,", tvDiff.tv_sec, tvDiff.tv_usec);
 
     ///////////////
     ///////////////
     ///////////////
 
-    // timer.Stop();
-    // auto gpuTime = timer.Elapsed() / (ITERATIONS * x.size());
-
-    float blasOut = 0.f;
-    // timer.Start();
     gettimeofday(&tvStart, NULL);
     for (unsigned j = 0; j < ITERATIONS; ++j) {
       for (unsigned i = 0; i < x.size(); ++i) {
-        blasOut = cblas_sdot(N, &x[i][0], 1, &y[i][0], 1);
+        unusedOut = cblas_sdot(N, &x[i][0], 1, &y[i][0], 1);
       }
     }
     gettimeofday(&tvEnd, NULL);
     timersub(&tvEnd, &tvStart, &tvDiff);
-    printf("%f,%ld.%06lds\n", blasOut, tvDiff.tv_sec, tvDiff.tv_usec);
-    // timer.Stop();
-    // auto blasTime = timer.Elapsed() / (ITERATIONS * x.size());
-
-    // printf("%u,%llu,%llu\n", N, gpuTime, blasTime);
+    printf("%ld.%06lds\n", tvDiff.tv_sec, tvDiff.tv_usec);
   }
 
   return 0;
