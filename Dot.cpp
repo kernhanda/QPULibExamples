@@ -36,6 +36,8 @@ void dot(Int N, Ptr<Float> A, Ptr<Float> B, Ptr<Float> result) {
   End
 
 	store(sum, c);
+
+  receive(aOld); receive(bOld);
 }
 
 class MillisecondTimer {
@@ -110,10 +112,16 @@ int main() {
 
    // Timestamps
    timeval tvStart, tvEnd, tvDiff;
+    const int NumQPUs = 12;
 
    // const int N = 16 * 24; // 192000
 
-    const int NumQPUs = 12;
+// Construct kernel
+          auto k = compile(dot);
+
+          // Use 12 QPUs
+          k.setNumQPUs(NumQPUs);
+
 
    printf("N,GPU_Calculated_Value,GPU_Time,BLAS_Calculated_Value,BLAS_Time\n");
    const int ITERATIONS = 100;
@@ -134,14 +142,14 @@ int main() {
 
      // warm-up gpu
      for (unsigned i = 0; i < x.size(); ++i) {
-       // Construct kernel
-          auto k = compile(dot);
+      //  // Construct kernel
+      //     auto k = compile(dot);
 
-          // Use 12 QPUs
-          k.setNumQPUs(NumQPUs);
+      //     // Use 12 QPUs
+      //     k.setNumQPUs(NumQPUs);
        k((int)(N / NumQPUs), &x[i], &y[i], &result);
        (void)std::accumulate(&result[0], &result[0] + result.size, 0.f);
-         QPULib::astHeap.clear();
+        //  QPULib::astHeap.clear();
      }
 
      printf("%u,", N);
@@ -150,14 +158,10 @@ int main() {
      gettimeofday(&tvStart, NULL);
      for (unsigned j = 0; j < ITERATIONS; ++j) {
        for (unsigned i = 0; i < x.size(); ++i) {
-         // Construct kernel
-          auto k = compile(dot);
 
-          // Use 12 QPUs
-          k.setNumQPUs(NumQPUs);
          k((int)(N / NumQPUs), &x[i], &y[i], &result);
          gpuOut = std::accumulate(&result[0], &result[0] + result.size, 0.f);
-         QPULib::astHeap.clear();
+        //  QPULib::astHeap.clear();
        }
      }
      gettimeofday(&tvEnd, NULL);
